@@ -1,12 +1,30 @@
-let activeEffect = null
+let activeEffect
 // export function getActiveEffect() {
 //   return activeEffect
 // }
 export function effect(fn) {
-  activeEffect = fn
-  fn()
+  // activeEffect = fn
+  // fn()
+  const effectFn = () => {
+    try {
+      clearUp(effectFn)
+      activeEffect = effectFn
+      fn()
+    } finally {
+      activeEffect = null
+    }
+  }
+  effectFn.deps = []
+  effectFn()
+  return effectFn
 }
-
+function clearUp(effectFn) {
+  const len = effectFn.deps.length
+  for (let i = 0; i < len; i++) {
+    effectFn.deps[i].delete(effectFn)
+  }
+  effectFn.deps.length = 0
+}
 const targetMap = new WeakMap()
 
 // obj = {
@@ -30,6 +48,7 @@ export function track(target, type, key) {
   // 每个属性上的的更改都是一个effect
   if (activeEffect) {
     deps.add(activeEffect)
+    activeEffect.deps.push(deps)
   }
   depsMap.set(key, deps)
 }
@@ -43,5 +62,8 @@ export function trigger(target, type, key, val) {
   if (!deps) {
     return
   }
-  deps.forEach(effect => effect())
+  // 在set上 又add 有 delete 会死循环
+  // deps.forEach(effect => effect())
+  const effectsDeps = new Set(deps)
+  effectsDeps.forEach(effectFn => effectFn())
 }
